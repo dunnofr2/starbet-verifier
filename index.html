@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StarBet - Provably Fair Verification</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050505;
+            --accent-yellow: #f5c518;
+            --accent-glow: rgba(245, 197, 24, 0.4);
+            --panel-bg: rgba(20, 20, 20, 0.6);
+            --text-main: #a1a1aa;
+            --text-light: #ffffff;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100vh;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow-x: hidden;
+        }
+
+        /* Animated Background Elements */
+        .bg-element {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(100px);
+            z-index: -1;
+            animation: float 20s infinite ease-in-out alternate;
+        }
+
+        .bg-1 {
+            width: 600px;
+            height: 600px;
+            background: rgba(245, 197, 24, 0.08);
+            top: -200px;
+            left: -100px;
+        }
+
+        .bg-2 {
+            width: 500px;
+            height: 500px;
+            background: rgba(255, 255, 255, 0.03);
+            bottom: -100px;
+            right: -100px;
+            animation-delay: -10s;
+        }
+
+        .bg-3 {
+            width: 400px;
+            height: 400px;
+            background: rgba(245, 197, 24, 0.05);
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-duration: 25s;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, 50px) scale(1.1); }
+            100% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            animation: slideDown 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .header h1 {
+            color: var(--text-light);
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -0.03em;
+            text-transform: lowercase;
+            text-shadow: 0 0 40px var(--accent-glow);
+        }
+
+        .header h1 span {
+            color: var(--accent-yellow);
+        }
+
+        .header p {
+            margin: 0.5rem 0 0 0;
+            font-size: 1.1rem;
+            letter-spacing: 0.2em;
+            text-transform: lowercase;
+            color: var(--text-main);
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            animation: scaleUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-light);
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: lowercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 1rem 1.2rem;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-light);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-yellow);
+            box-shadow: 0 0 20px var(--accent-glow);
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        .row {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .row .form-group {
+            flex: 1;
+        }
+
+        button.verify-btn {
+            width: 100%;
+            padding: 1.2rem;
+            background: linear-gradient(135deg, #f5c518, #d4a70b);
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            text-transform: lowercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            margin-top: 1rem;
+            box-shadow: 0 10px 20px var(--accent-glow);
+        }
+
+        button.verify-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+
+        button.verify-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Results Section */
+        .results {
+            margin-top: 2.5rem;
+            display: none;
+            border-top: 1px solid var(--border-color);
+            padding-top: 2.5rem;
+            animation: slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .hash-display {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid rgba(245, 197, 24, 0.3);
+            word-break: break-all;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-yellow);
+            font-size: 0.95rem;
+            text-align: center;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .grid-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tile {
+            width: 55px;
+            height: 55px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 800;
+            font-size: 1.4rem;
+            color: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+
+        .tile.revealed {
+            transform: rotateY(180deg);
+        }
+
+        .tile.mine.revealed {
+            background: linear-gradient(135deg, #ff4b4b, #b91c1c);
+            border-color: #ff4b4b;
+            color: white;
+            box-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .tile.diamond.revealed {
+            background: linear-gradient(135deg, #10b981, #047857);
+            border-color: #10b981;
+            color: white;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .tile .content {
+            transform: rotateY(180deg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .code-panel {
+            flex: 1;
+            max-width: 500px;
+            margin-top: 0;
+        }
+
+        .main-layout {
+            display: flex;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1200px;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        @media (max-width: 900px) {
+            .main-layout {
+                flex-direction: column;
+                align-items: center;
+            }
+            .code-panel {
+                max-width: 600px;
+                width: 100%;
+            }
+        }
+
+        .code-panel pre {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 1.5rem;
+            border-radius: 12px;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-yellow);
+        }
+
+        .code-panel p {
+            text-transform: lowercase;
+            margin-bottom: 1rem;
+            letter-spacing: 0.1em;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes scaleUp {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @media (max-width: 600px) {
+            .tile { width: 45px; height: 45px; font-size: 1.2rem; }
+            .grid { gap: 8px; padding: 15px; }
+            .header h1 { font-size: 2.5rem; }
+            .row { flex-direction: column; gap: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-element bg-1"></div>
+<div class="bg-element bg-2"></div>
+<div class="bg-element bg-3"></div>
+
+<div class="container">
+    <div class="header">
+        <h1>star<span>bet</span></h1>
+        <p>provably fair verifier</p>
+    </div>
+
+    <div class="main-layout">
+        <div class="panel">
+            <div class="form-group">
+                <label for="serverSeed">server seed</label>
+                <input type="text" id="serverSeed" placeholder="paste the exact server seed..." autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="clientSeed">client seed</label>
+                <input type="text" id="clientSeed" placeholder="paste your client seed..." autocomplete="off">
+            </div>
+            
+            <div class="row">
+                <div class="form-group">
+                    <label for="nonce">nonce</label>
+                    <input type="number" id="nonce" placeholder="e.g. 1" min="1" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="mineCount">mine count</label>
+                    <input type="number" id="mineCount" placeholder="e.g. 3" min="1" max="24" autocomplete="off">
+                </div>
+            </div>
+            
+            <button class="verify-btn" onclick="verify()">verify fairness</button>
+    
+            <div class="results" id="resultsArea">
+                <div class="form-group">
+                    <label style="text-align: center; color: var(--accent-yellow);">calculated cryptographic hash</label>
+                    <div class="hash-display" id="hashOutput">awaiting verification...</div>
+                </div>
+                
+                <div class="form-group">
+                    <label style="text-align: center; margin-top: 2rem;">verified board</label>
+                    <div class="grid-container">
+                        <div class="grid" id="gridOutput">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+        <div class="panel code-panel">
+        <p>want to verify manually? run this python code in any compiler:</p>
+        <pre><code>import hashlib
+import hmac
+
+def generate_mines(server_seed, client_seed, nonce, mine_count):
+    message = f"{client_seed}-{nonce}".encode('utf-8')
+    key = server_seed.encode('utf-8')
+    
+    hash_result = hmac.new(key, message, hashlib.sha256).hexdigest()
+    
+    positions = list(range(25))
+    grid = ['diamond'] * 25
+    
+    hash_index = 0
+    for i in range(mine_count):
+        if hash_index + 8 > len(hash_result):
+            new_msg = f"{client_seed}-{nonce}-{i}".encode('utf-8')
+            hash_result = hmac.new(key, new_msg, hashlib.sha256).hexdigest()
+            hash_index = 0
+            
+        sub_hash = hash_result[hash_index:hash_index+8]
+        hash_index += 8
+        
+        random_num = int(sub_hash, 16)
+        chosen_index = random_num % len(positions)
+        
+        actual_pos = positions[chosen_index]
+        grid[actual_pos] = 'mine'
+        positions.pop(chosen_index)
+        
+    return grid
+
+print(generate_mines("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, 3))</code></pre>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function verify() {
+        const serverSeed = document.getElementById('serverSeed').value.trim();
+        const clientSeed = document.getElementById('clientSeed').value.trim();
+        const nonce = document.getElementById('nonce').value.trim();
+        const mineCount = parseInt(document.getElementById('mineCount').value);
+
+        if (!serverSeed || !clientSeed || !nonce || isNaN(mineCount)) {
+            alert('Please fill out all fields correctly.');
+            return;
+        }
+
+        if (mineCount < 1 || mineCount > 24) {
+            alert('Mine count must be between 1 and 24.');
+            return;
+        }
+
+        let message = `${clientSeed}-${nonce}`;
+        let hashResult = CryptoJS.HmacSHA256(message, serverSeed).toString(CryptoJS.enc.Hex);
+        
+        document.getElementById('hashOutput').textContent = hashResult;
+
+        let positions = Array.from({length: 25}, (_, i) => i);
+        let grid = Array(25).fill('diamond');
+        
+        let hashIndex = 0;
+        let currentHash = hashResult;
+
+        for (let i = 0; i < mineCount; i++) {
+            if (hashIndex + 8 > currentHash.length) {
+                let newMsg = `${clientSeed}-${nonce}-${i}`;
+                currentHash = CryptoJS.HmacSHA256(newMsg, serverSeed).toString(CryptoJS.enc.Hex);
+                hashIndex = 0;
+            }
+            
+            let subHash = currentHash.substring(hashIndex, hashIndex + 8);
+            hashIndex += 8;
+            
+            let randomNum = parseInt(subHash, 16);
+            let chosenIndex = randomNum % positions.length;
+            
+            let actualPos = positions[chosenIndex];
+            grid[actualPos] = 'mine';
+            
+            positions.splice(chosenIndex, 1);
+        }
+
+        const gridOutput = document.getElementById('gridOutput');
+        gridOutput.innerHTML = '';
+        document.getElementById('resultsArea').style.display = 'block';
+
+        for (let i = 0; i < 25; i++) {
+            const tile = document.createElement('div');
+            tile.className = `tile ${grid[i]}`;
+            
+            const content = document.createElement('div');
+            content.className = 'content';
+            
+            if (grid[i] === 'mine') {
+                content.textContent = '💣';
+            } else {
+                const img = document.createElement('img');
+                img.src = 'Robux_2019_Logo_gold.png';
+                img.style.width = '35px';
+                img.style.height = '35px';
+                img.style.objectFit = 'contain';
+                content.appendChild(img);
+            }
+            
+            tile.appendChild(content);
+            gridOutput.appendChild(tile);
+
+            setTimeout(() => {
+                tile.classList.add('revealed');
+            }, 100 + (i * 30));
+        }
+    }
+</script>
+
+</body>
+</html>
