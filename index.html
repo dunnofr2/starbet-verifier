@@ -138,7 +138,7 @@
             letter-spacing: 0.05em;
         }
 
-        .form-group input {
+        .form-group input, .form-group select {
             width: 100%;
             padding: 1rem 1.2rem;
             background: rgba(0, 0, 0, 0.4);
@@ -149,13 +149,31 @@
             font-size: 1rem;
             box-sizing: border-box;
             transition: all 0.3s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
         }
 
-        .form-group input:focus {
+        .form-group input:focus, .form-group select:focus {
             outline: none;
             border-color: var(--accent-yellow);
             box-shadow: 0 0 20px var(--accent-glow);
             background: rgba(0, 0, 0, 0.6);
+        }
+        
+        .select-wrapper {
+            position: relative;
+        }
+
+        .select-wrapper::after {
+            content: '▼';
+            font-size: 0.8rem;
+            color: var(--text-main);
+            position: absolute;
+            right: 1.2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
         }
 
         .row {
@@ -362,12 +380,23 @@
                 <input type="text" id="clientSeed" placeholder="paste your client seed..." autocomplete="off">
             </div>
             
+            <div class="form-group">
+                <label for="gameType">game</label>
+                <div class="select-wrapper">
+                    <select id="gameType" onchange="toggleGameInputs()">
+                        <option value="mines">mines</option>
+                        <option value="blackjack">blackjack</option>
+                        <option value="coinflip">coinflip</option>
+                        <option value="towers">towers</option>
+                    </select>
+                </div>
+            </div>
             <div class="row">
                 <div class="form-group">
                     <label for="nonce">nonce</label>
                     <input type="number" id="nonce" placeholder="e.g. 1" min="1" autocomplete="off">
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="mineCountGroup">
                     <label for="mineCount">mine count</label>
                     <input type="number" id="mineCount" placeholder="e.g. 3" min="1" max="24" autocomplete="off">
                 </div>
@@ -382,8 +411,8 @@
                 </div>
                 
                 <div class="form-group">
-                    <label style="text-align: center; margin-top: 2rem;">verified board</label>
-                    <div class="grid-container">
+                    <label style="text-align: center; margin-top: 2rem;">verified result</label>
+                    <div class="grid-container" id="gameResultArea">
                         <div class="grid" id="gridOutput">
                         </div>
                     </div>
@@ -430,19 +459,24 @@ print(generate_mines("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, 3))</code></pre>
 </div>
 
 <script>
+    function toggleGameInputs() {
+        const type = document.getElementById('gameType').value;
+        const mineCountGroup = document.getElementById('mineCountGroup');
+        if (type === 'blackjack' || type === 'coinflip' || type === 'towers') {
+            mineCountGroup.style.display = 'none';
+        } else {
+            mineCountGroup.style.display = 'block';
+        }
+    }
+
     async function verify() {
+        const gameType = document.getElementById('gameType').value;
         const serverSeed = document.getElementById('serverSeed').value.trim();
         const clientSeed = document.getElementById('clientSeed').value.trim();
         const nonce = document.getElementById('nonce').value.trim();
-        const mineCount = parseInt(document.getElementById('mineCount').value);
 
-        if (!serverSeed || !clientSeed || !nonce || isNaN(mineCount)) {
+        if (!serverSeed || !clientSeed || !nonce) {
             alert('Please fill out all fields correctly.');
-            return;
-        }
-
-        if (mineCount < 1 || mineCount > 24) {
-            alert('Mine count must be between 1 and 24.');
             return;
         }
 
@@ -450,60 +484,178 @@ print(generate_mines("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, 3))</code></pre>
         let hashResult = CryptoJS.HmacSHA256(message, serverSeed).toString(CryptoJS.enc.Hex);
         
         document.getElementById('hashOutput').textContent = hashResult;
-
-        let positions = Array.from({length: 25}, (_, i) => i);
-        let grid = Array(25).fill('diamond');
-        
-        let hashIndex = 0;
-        let currentHash = hashResult;
-
-        for (let i = 0; i < mineCount; i++) {
-            if (hashIndex + 8 > currentHash.length) {
-                let newMsg = `${clientSeed}-${nonce}-${i}`;
-                currentHash = CryptoJS.HmacSHA256(newMsg, serverSeed).toString(CryptoJS.enc.Hex);
-                hashIndex = 0;
-            }
-            
-            let subHash = currentHash.substring(hashIndex, hashIndex + 8);
-            hashIndex += 8;
-            
-            let randomNum = parseInt(subHash, 16);
-            let chosenIndex = randomNum % positions.length;
-            
-            let actualPos = positions[chosenIndex];
-            grid[actualPos] = 'mine';
-            
-            positions.splice(chosenIndex, 1);
-        }
-
-        const gridOutput = document.getElementById('gridOutput');
-        gridOutput.innerHTML = '';
         document.getElementById('resultsArea').style.display = 'block';
 
-        for (let i = 0; i < 25; i++) {
-            const tile = document.createElement('div');
-            tile.className = `tile ${grid[i]}`;
+        if (gameType === 'mines') {
+            const mineCount = parseInt(document.getElementById('mineCount').value);
+            if (isNaN(mineCount) || mineCount < 1 || mineCount > 24) {
+                alert('Mine count must be between 1 and 24.');
+                return;
+            }
+
+            let positions = Array.from({length: 25}, (_, i) => i);
+            let grid = Array(25).fill('diamond');
             
-            const content = document.createElement('div');
-            content.className = 'content';
+            let hashIndex = 0;
+            let currentHash = hashResult;
+
+            for (let i = 0; i < mineCount; i++) {
+                if (hashIndex + 8 > currentHash.length) {
+                    let newMsg = `${clientSeed}-${nonce}-${i}`;
+                    currentHash = CryptoJS.HmacSHA256(newMsg, serverSeed).toString(CryptoJS.enc.Hex);
+                    hashIndex = 0;
+                }
+                
+                let subHash = currentHash.substring(hashIndex, hashIndex + 8);
+                hashIndex += 8;
+                
+                let randomNum = parseInt(subHash, 16);
+                let chosenIndex = randomNum % positions.length;
+                
+                let actualPos = positions[chosenIndex];
+                grid[actualPos] = 'mine';
+                
+                positions.splice(chosenIndex, 1);
+            }
+
+            const gameResultArea = document.getElementById('gameResultArea');
+            gameResultArea.innerHTML = '<div class="grid" id="gridOutput"></div>';
+            const gridOutput = document.getElementById('gridOutput');
+
+            for (let i = 0; i < 25; i++) {
+                const tile = document.createElement('div');
+                tile.className = `tile ${grid[i]}`;
+                
+                const content = document.createElement('div');
+                content.className = 'content';
+                
+                if (grid[i] === 'mine') {
+                    content.textContent = '💣';
+                } else {
+                    const img = document.createElement('img');
+                    img.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Robux_2019_Logo_gold.svg/1024px-Robux_2019_Logo_gold.svg.png';
+                    img.style.width = '35px';
+                    img.style.height = '35px';
+                    img.style.objectFit = 'contain';
+                    content.appendChild(img);
+                }
+                
+                tile.appendChild(content);
+                gridOutput.appendChild(tile);
+
+                setTimeout(() => {
+                    tile.classList.add('revealed');
+                }, 100 + (i * 30));
+            }
+        } else if (gameType === 'blackjack') {
+            let deck = [];
+            const suits = ['♠️', '♥️', '♦️', '♣️'];
+            const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
             
-            if (grid[i] === 'mine') {
-                content.textContent = '💣';
-            } else {
-                const img = document.createElement('img');
-                img.src = 'Robux_2019_Logo_gold.png';
-                img.style.width = '35px';
-                img.style.height = '35px';
-                img.style.objectFit = 'contain';
-                content.appendChild(img);
+            for (let suit of suits) {
+                for (let rank of ranks) {
+                    deck.push(`${suit} ${rank}`);
+                }
             }
             
-            tile.appendChild(content);
-            gridOutput.appendChild(tile);
-
-            setTimeout(() => {
-                tile.classList.add('revealed');
-            }, 100 + (i * 30));
+            let currentHash = hashResult;
+            let hashIndex = 0;
+            
+            for (let i = 51; i > 0; i--) {
+                if (hashIndex + 8 > currentHash.length) {
+                    let newMsg = `${clientSeed}-${nonce}-${i}`;
+                    currentHash = CryptoJS.HmacSHA256(newMsg, serverSeed).toString(CryptoJS.enc.Hex);
+                    hashIndex = 0;
+                }
+                
+                let subHash = currentHash.substring(hashIndex, hashIndex + 8);
+                hashIndex += 8;
+                
+                let randomNum = parseInt(subHash, 16);
+                let j = randomNum % (i + 1);
+                
+                let temp = deck[i];
+                deck[i] = deck[j];
+                deck[j] = temp;
+            }
+            
+            const gameResultArea = document.getElementById('gameResultArea');
+            let html = `<div style="display: flex; flex-direction: column; gap: 1rem; color: var(--text-light); width: 100%; max-width: 400px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;">`;
+            
+            html += `<div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                <div style="color: var(--accent-yellow); margin-bottom: 0.5rem; text-transform: uppercase; font-size: 0.8rem; font-weight: 800;">Player's Hand</div>
+                <div style="font-size: 1.2rem;">${deck[0]}, ${deck[2]}</div>
+            </div>`;
+            
+            html += `<div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                <div style="color: var(--accent-yellow); margin-bottom: 0.5rem; text-transform: uppercase; font-size: 0.8rem; font-weight: 800;">Dealer's Hand</div>
+                <div style="font-size: 1.2rem;">${deck[1]}, ${deck[3]}</div>
+            </div>`;
+            
+            html += `<div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                <div style="color: var(--accent-yellow); margin-bottom: 0.5rem; text-transform: uppercase; font-size: 0.8rem; font-weight: 800;">Next Cards in Deck</div>
+                <div style="font-size: 1.1rem; color: #a1a1aa;">${deck.slice(4, 9).join(' · ')}</div>
+            </div>`;
+            
+            html += `</div>`;
+            gameResultArea.innerHTML = html;
+        } else if (gameType === 'coinflip') {
+            const gameResultArea = document.getElementById('gameResultArea');
+            
+            let subHash = hashResult.substring(0, 8);
+            let randomNum = parseInt(subHash, 16);
+            let result = randomNum % 2 === 0 ? "HEADS" : "TAILS";
+            
+            let color = result === "HEADS" ? "#f5c518" : "#a1a1aa";
+            
+            let html = `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; max-width: 200px; margin: 0 auto; aspect-ratio: 1; border-radius: 50%; background: rgba(0,0,0,0.5); border: 2px solid ${color}; box-shadow: 0 0 30px ${color}40;">
+                <div style="font-size: 2.5rem; font-weight: 800; color: ${color}; letter-spacing: 0.1em;">${result}</div>
+            </div>`;
+            
+            gameResultArea.innerHTML = html;
+        } else if (gameType === 'towers') {
+            const gameResultArea = document.getElementById('gameResultArea');
+            let tower = [];
+            let hashIndex = 0;
+            let currentHash = hashResult;
+            
+            for (let row = 0; row < 8; row++) {
+                let rowTiles = ['safe', 'safe', 'safe'];
+                let positions = [0, 1, 2];
+                
+                for (let b = 0; b < 1; b++) {
+                    if (hashIndex + 8 > currentHash.length) {
+                        // Re-hash using simple fallback for client-side representation,
+                        // Note: For true verification on client without crypto API, we'd need CryptoJS.
+                        // We will just assume the first hash has enough entropy (64 chars = 8 bytes * 8 rows = 64). Wait, 8 * 8 = 64 chars exactly!
+                        // No re-hashing needed for 1 bomb per row over 8 rows!
+                    }
+                    let subHash = currentHash.substring(hashIndex, hashIndex + 8);
+                    hashIndex += 8;
+                    let randomNum = parseInt(subHash, 16);
+                    let chosenIndex = randomNum % positions.length;
+                    let actualPos = positions[chosenIndex];
+                    rowTiles[actualPos] = 'bomb';
+                    positions.splice(chosenIndex, 1);
+                }
+                tower.push(rowTiles);
+            }
+            
+            let html = `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; width: 100%; max-width: 250px; margin: 0 auto;">`;
+            
+            // Render from top (row 7) to bottom (row 0)
+            for (let r = 7; r >= 0; r--) {
+                for (let c = 0; c < 3; c++) {
+                    let tile = tower[r][c];
+                    if (tile === 'bomb') {
+                        html += `<div style="aspect-ratio: 1; border-radius: 12px; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">💣</div>`;
+                    } else {
+                        html += `<div style="aspect-ratio: 1; border-radius: 12px; background: #10b981; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Robux_2019_Logo_gold.svg/1024px-Robux_2019_Logo_gold.svg.png" style="width: 28px; height: 28px; object-fit: contain;"></div>`;
+                    }
+                }
+            }
+            html += `</div>`;
+            gameResultArea.innerHTML = html;
         }
     }
 </script>
