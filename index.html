@@ -401,6 +401,19 @@
                     <label for="mineCount">mine count</label>
                     <input type="number" id="mineCount" placeholder="e.g. 3" min="1" max="24" autocomplete="off">
                 </div>
+                <div class="form-group" id="towersGroup" style="display: none;">
+                    <label for="towersMode">difficulty</label>
+                    <div class="select-wrapper">
+                        <select id="towersMode">
+                            <option value="4">normal (4 tiles)</option>
+                            <option value="3">hard (3 tiles)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" id="houseEdgeGroup" style="display: none;">
+                    <label for="houseEdge">limbo multiplier factor</label>
+                    <input type="number" id="houseEdge" value="0.975" step="0.005" min="0.5" max="1" autocomplete="off">
+                </div>
             </div>
             
             <button class="verify-btn" onclick="verify()">verify fairness</button>
@@ -462,12 +475,9 @@ print(generate_mines("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, 3))</code></pre>
 <script>
     function toggleGameInputs() {
         const type = document.getElementById('gameType').value;
-        const mineCountGroup = document.getElementById('mineCountGroup');
-        if (type === 'blackjack' || type === 'coinflip' || type === 'towers' || type === 'limbo') {
-            mineCountGroup.style.display = 'none';
-        } else {
-            mineCountGroup.style.display = 'block';
-        }
+        document.getElementById('mineCountGroup').style.display = type === 'mines' ? 'block' : 'none';
+        document.getElementById('towersGroup').style.display = type === 'towers' ? 'block' : 'none';
+        document.getElementById('houseEdgeGroup').style.display = type === 'limbo' ? 'block' : 'none';
     }
 
     async function verify() {
@@ -481,7 +491,8 @@ print(generate_mines("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, 3))</code></pre>
             return;
         }
 
-        let message = `${clientSeed}-${nonce}`;
+        // limbo is signed as "client:nonce"; every other game uses "client-nonce"
+        let message = gameType === 'limbo' ? `${clientSeed}:${nonce}` : `${clientSeed}-${nonce}`;
         let hashResult = CryptoJS.HmacSHA256(message, serverSeed).toString(CryptoJS.enc.Hex);
         
         document.getElementById('hashOutput').textContent = hashResult;
@@ -585,17 +596,17 @@ print(generate_mines("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, 3))</code></pre>
             
             html += `<div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
                 <div style="color: var(--accent-yellow); margin-bottom: 0.5rem; text-transform: uppercase; font-size: 0.8rem; font-weight: 800;">Player's Hand</div>
-                <div style="font-size: 1.2rem;">${deck[0]}, ${deck[2]}</div>
+                <div style="font-size: 1.2rem;">${deck[51]}, ${deck[50]}</div>
             </div>`;
             
             html += `<div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
                 <div style="color: var(--accent-yellow); margin-bottom: 0.5rem; text-transform: uppercase; font-size: 0.8rem; font-weight: 800;">Dealer's Hand</div>
-                <div style="font-size: 1.2rem;">${deck[1]}, ${deck[3]}</div>
+                <div style="font-size: 1.2rem;">${deck[49]}, ${deck[48]}</div>
             </div>`;
             
             html += `<div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
                 <div style="color: var(--accent-yellow); margin-bottom: 0.5rem; text-transform: uppercase; font-size: 0.8rem; font-weight: 800;">Next Cards in Deck</div>
-                <div style="font-size: 1.1rem; color: #a1a1aa;">${deck.slice(4, 9).join(' · ')}</div>
+                <div style="font-size: 1.1rem; color: #a1a1aa;">${[47, 46, 45, 44, 43].map(i => deck[i]).join(' · ')}</div>
             </div>`;
             
             html += `</div>`;
@@ -616,13 +627,14 @@ print(generate_mines("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, 3))</code></pre>
             gameResultArea.innerHTML = html;
         } else if (gameType === 'towers') {
             const gameResultArea = document.getElementById('gameResultArea');
+            const cols = parseInt(document.getElementById('towersMode').value);
             let tower = [];
             let hashIndex = 0;
             let currentHash = hashResult;
             
             for (let row = 0; row < 8; row++) {
-                let rowTiles = ['safe', 'safe', 'safe'];
-                let positions = [0, 1, 2];
+                let rowTiles = Array(cols).fill('safe');
+                let positions = Array.from({length: cols}, (_, i) => i);
                 
                 for (let b = 0; b < 1; b++) {
                     if (hashIndex + 8 > currentHash.length) {
@@ -642,11 +654,11 @@ print(generate_mines("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, 3))</code></pre>
                 tower.push(rowTiles);
             }
             
-            let html = `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; width: 100%; max-width: 250px; margin: 0 auto;">`;
+            let html = `<div style="display: grid; grid-template-columns: repeat(${cols}, 1fr); gap: 0.5rem; width: 100%; max-width: 250px; margin: 0 auto;">`;
             
             // Render from top (row 7) to bottom (row 0)
             for (let r = 7; r >= 0; r--) {
-                for (let c = 0; c < 3; c++) {
+                for (let c = 0; c < cols; c++) {
                     let tile = tower[r][c];
                     if (tile === 'bomb') {
                         html += `<div style="aspect-ratio: 1; border-radius: 12px; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">💣</div>`;
@@ -663,7 +675,9 @@ print(generate_mines("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, 3))</code></pre>
             let val = parseInt(subHash, 16);
             if (val === 0) val = 1;
             let max_val = 4294967296; // 2^32
-            let multiplier = 0.975 / (val / max_val);
+            let edge = parseFloat(document.getElementById('houseEdge').value);
+            if (isNaN(edge)) edge = 0.975;
+            let multiplier = edge / (val / max_val);
             if (multiplier < 1.0) multiplier = 1.0;
             
             let result = multiplier.toFixed(2) + "x";
