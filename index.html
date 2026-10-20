@@ -461,6 +461,7 @@
                         <option value="towers">towers</option>
                         <option value="limbo">limbo</option>
                         <option value="hilo">hilo</option>
+                        <option value="rps">rps</option>
                     </select>
                 </div>
             </div>
@@ -520,6 +521,7 @@
                 <button class="tab-btn" data-game="towers" onclick="selectScript('towers')">towers</button>
                 <button class="tab-btn" data-game="limbo" onclick="selectScript('limbo')">limbo</button>
                 <button class="tab-btn" data-game="hilo" onclick="selectScript('hilo')">hilo</button>
+                <button class="tab-btn" data-game="rps" onclick="selectScript('rps')">rps</button>
             </div>
             
             <div class="code-actions">
@@ -705,7 +707,18 @@ def generate_hilo_card(server_seed, client_seed, nonce, card_index=0):
     return f"{ranks[num % 13]} of {suits[num // 13]} (Value: {(num % 13) + 1})"
 
 for i in range(10):
-    print(f"Card {i}:", generate_hilo_card("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, card_index=i))`
+    print(f"Card {i}:", generate_hilo_card("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1, card_index=i))`,
+
+        rps: `import hashlib, hmac
+
+def generate_rps(server_seed, client_seed, nonce):
+    message = f"{client_seed}-{nonce}".encode('utf-8')
+    key = server_seed.encode('utf-8')
+    hash_result = hmac.new(key, message, hashlib.sha256).hexdigest()
+    return ["rock", "paper", "scissors"][int(hash_result[:8], 16) % 3]
+
+result = generate_rps("YOUR_SERVER_SEED", "YOUR_CLIENT_SEED", 1)
+print("House Move:", result.upper())`
     };
 
     let currentScriptGame = 'mines';
@@ -915,6 +928,17 @@ for i in range(10):
             
             html += `</div>`;
             gameResultArea.innerHTML = html;
+        } else if (gameType === 'rps') {
+            const gameResultArea = document.getElementById('gameResultArea');
+            const moves = ['ROCK', 'PAPER', 'SCISSORS'];
+            const icons = ['🪨', '📄', '✂️'];
+            const idx = parseInt(hashResult.substring(0, 8), 16) % 3;
+            
+            gameResultArea.innerHTML = `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; max-width: 200px; margin: 0 auto; aspect-ratio: 1; border-radius: 50%; background: rgba(0,0,0,0.5); border: 2px solid #f5c518; box-shadow: 0 0 30px #f5c51840;">
+                <div style="font-size: 3rem;">${icons[idx]}</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: #f5c518; letter-spacing: 0.1em;">${moves[idx]}</div>
+                <div style="font-size: 0.7rem; color: #a1a1aa; text-transform: uppercase; margin-top: 0.25rem;">house move</div>
+            </div>`;
         } else if (gameType === 'coinflip') {
             const gameResultArea = document.getElementById('gameResultArea');
             
